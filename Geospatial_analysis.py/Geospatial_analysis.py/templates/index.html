@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEE Data Visualization</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #map { height: 600px; width: 100%; }
+        .controls { margin-top: 20px; }
+        button { margin-right: 10px; padding: 5px 10px; }
+        #loading { display: none; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Google Earth Engine Data Visualization</h1>
+    <div id="location-input">
+        <button onclick="useIPLocation()">Use My Location</button>
+        <input type="text" id="manual-location" placeholder="Enter lat,lon (e.g., -1.9441,30.0619)">
+        <button onclick="useManualLocation()">Use This Location</button>
+    </div>
+    <div id="map"></div>
+    <div class="controls">
+        <button onclick="loadDataset('cloud')">Cloud Cover</button>
+        <button onclick="loadDataset('land_use')">Land Use</button>
+        <button onclick="loadDataset('topography')">Topography</button>
+        <button onclick="loadDataset('soil_moisture')">Soil Moisture</button>
+        <button onclick="loadDataset('earthquakes')">Earthquakes</button>
+        <span id="loading">Loading...</span>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let geeLayer;
+        let userMarker;
+        let currentDataset;
+
+        function useIPLocation() {
+            fetch('/get_ip_location')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.loc) {
+                        const [lat, lon] = data.loc.split(',');
+                        setLocation(lat, lon, data.city, data.country);
+                    } else {
+                        alert('Unable to get location from IP. Please enter manually.');
+                    }
+                });
+        }
+
+        function useManualLocation() {
+            const input = document.getElementById('manual-location').value;
+            const [lat, lon] = input.split(',');
+            if (lat && lon) {
+                setLocation(lat.trim(), lon.trim(), 'Custom Location', '');
+            } else {
+                alert('Invalid input. Please enter latitude and longitude separated by a comma.');
+            }
+        }
+
+        function setLocation(lat, lon, city, country) {
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            userMarker = L.marker([lat, lon]).addTo(map);
+            userMarker.bindPopup(`Your location: ${city}, ${country}`).openPopup();
+            
+            userMarker.on('dblclick', function() {
+                map.setView([lat, lon], 15);
+            });
+
+            map.setView([lat, lon], 10);
+        }
+
+        function loadDataset(dataset) {
+            currentDataset = dataset;
+            document.getElementById('loading').style.display = 'inline';
+            const bounds = map.getBounds();
+            const boundsArray = [
+                bounds.getWest(),
+                bounds.getSouth(),
+                bounds.getEast(),
+                bounds.getNorth()
+            ];
+
+            fetch('/get_gee_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    dataset: dataset,
+                    bounds: boundsArray,
+                    zoom: map.getZoom()
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (geeLayer) {
+                    map.removeLayer(geeLayer);
+                }
+                geeLayer = L.tileLayer(data.tile_url, {
+                    attribution: 'Google Earth Engine',
+                    opacity: 0.7
+                }).addTo(map);
+                geeLayer.options.dataset = dataset;
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('An error occurred while loading the dataset. Please try again.');
+            });
+        }
+
+        map.on('zoomend moveend', function() {
+            if (geeLayer && currentDataset) {
+                loadDataset(currentDataset);
+            }
+        });
+
+        useIPLocation();  // Automatically use IP location on page load
+    </script>
+</body>
+</html>
