@@ -41,3 +41,8 @@ def top_ten(subreddit):
 
     except Exception:
         print("None")
+
+
+if __name__ == '__main__':
+    print(top_ten("zerowastecz"))
+
