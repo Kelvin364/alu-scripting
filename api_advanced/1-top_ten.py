@@ -5,42 +5,39 @@
 
 import requests
 
-headers = {'User-Agent': 'MyAPI/0.0.1'}
 
+def top_ten(subreddit):
+    """
+    Prints the titles of the first 10 hot posts listed for a given subreddit.
+    Args:
+        subreddit: subreddit to search
+    """
+    # Set custom User-Agent to avoid Too Many Requests error
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
+    
+    # Limit to 10 posts in query parameters
+    params = {'limit': 10}
 
-def recurse(subreddit, after="", hot_list=[], page_counter=0):
-    """Return all hot posts in a subreddit."""
+    try:
+        # Make GET request to Reddit API
+        response = requests.get(url,
+                              headers=headers,
+                              params=params,
+                              allow_redirects=False)
+        
+        # Check if subreddit is invalid
+        if response.status_code == 404:
+            print("None")
+            return
 
-    subreddit_url = "https://reddit.com/r/{}/hot.json".format(subreddit)
+        # Parse response data
+        data = response.json()
+        posts = data['data']['children']
+        
+        # Print first 10 post titles
+        for post in posts:
+            print(post['data']['title'])
 
-    parameters = {'limit': 100, 'after': after}
-    response = requests.get(subreddit_url, headers=headers, params=parameters)
-
-    if response.status_code == 200:
-        json_data = response.json()
-        # get the 'after' value from the response to pass it on the request
-
-        # get title and append it to the hot_list
-        for child in json_data.get('data').get('children'):
-            title = child.get('data').get('title')
-            hot_list.append(title)
-
-        # variable after indicates if there is data on the next pagination
-        # on the reddit API after holds a unique name for that subreddit page.
-        # if it is None it indicates it is the last page.
-        after = json_data.get('data').get('after')
-        if after is not None:
-
-            page_counter += 1
-            # print(len(hot_list))
-            return recurse(subreddit, after=after,
-                           hot_list=hot_list, page_counter=page_counter)
-        else:
-            return hot_list
-
-    else:
-        return None
-
-
-if __name__ == '__main__':
-    print(recurse("zerowastecz"))
+    except Exception:
+        print("None")
