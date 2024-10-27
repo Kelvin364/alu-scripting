@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Script that fetches 10 hot posts for a given subreddit."""
+"""Script that fetch 10 hot post for a given subreddit."""
 import requests
 
 
